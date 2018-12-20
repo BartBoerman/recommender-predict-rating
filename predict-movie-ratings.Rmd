@@ -15,22 +15,21 @@ edx <- readRDS("edx.rds")
 ## Overview of capstone project 
 
 
-## EDX MovieLens dataset
+## EDX MovieLens dataset description
 
-* the dataset contains `r dim(edx)[1]` records and `r dim(edx)[2]` columns
-* users:
-* movies:
-* titles:  ,let's investigate how this can differ from number of movies
-* genres:
-* ratings: , in steps of 0.05 from 0 to 5
-* periode ?
+The training dataset provided by HarvardX contains `r dim(edx)[1]` records and `r dim(edx)[2]` columns with:
+* `r n_distinct(edx$userId)` users,
+* `r n_distinct(edx$movieId)` movies,
+* `r n_distinct(edx$title)` titles, let's investigate how this can differ from number of movies,
+* `r n_distinct(edx$genres)` genres,
+* `r n_distinct(edx$rating)`, ratings, in steps of 0.05 from 0 to 5
+* Periode from ... to ... ?
 
 ## Descriptive statistics
 
 ```{r}
 
 ```
-
 
 ## Exploratory data analysis
 
