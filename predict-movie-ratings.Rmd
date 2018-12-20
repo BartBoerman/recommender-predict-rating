@@ -1,0 +1,38 @@
+---
+title: "Predict movie ratings with MovieLens dataset"
+author: "Bart Boerman"
+date: "20-12-2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(dplyr)
+```
+
+## Overview of capstone project 
+
+
+## EDX MovieLens dataset
+
+* the dataset contains 'r dim(edx)[1]' records and 'dim(edx)[2]' columns
+* users:
+* movies:
+* titles:  ,let's investigate how this can differ from number of movies
+* genres:
+* ratings: , in steps of 0.05 from 0 to 5
+* periode ?
+
+## Descriptive statistics
+
+
+
+## Exploratory data analysis
+
+
+
+
+
+
+
+
