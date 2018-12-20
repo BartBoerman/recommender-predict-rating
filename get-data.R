@@ -54,3 +54,14 @@ write.csv(validation %>% select(userId, movieId) %>% mutate(rating = NA),
           "submission.csv", na = "", row.names=FALSE)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
+
+#############################################################
+# Added by Bart Boerman
+#############################################################
+
+# Save object to R data format so it can be restored into a rmd file or
+# in a new R session. This will take some seconds for large files but
+# is fasther then rebuilding large objects from scratch.
+# Refer to: http://www.sthda.com/english/wiki/saving-data-into-r-data-format-rds-and-rdata
+
+saveRDS(edx, "edx.rds")

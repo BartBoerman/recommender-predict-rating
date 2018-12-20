@@ -8,6 +8,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require(dplyr)
+setwd("~/Data-science/MovieLens")
+edx <- readRDS("edx.rds")
 ```
 
 ## Overview of capstone project 
@@ -15,7 +17,7 @@ require(dplyr)
 
 ## EDX MovieLens dataset
 
-* the dataset contains 'r dim(edx)[1]' records and 'dim(edx)[2]' columns
+* the dataset contains `r dim(edx)[1]` records and `r dim(edx)[2]` columns
 * users:
 * movies:
 * titles:  ,let's investigate how this can differ from number of movies
@@ -25,6 +27,9 @@ require(dplyr)
 
 ## Descriptive statistics
 
+```{r}
+
+```
 
 
 ## Exploratory data analysis
