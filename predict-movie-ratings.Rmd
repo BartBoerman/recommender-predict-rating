@@ -6,30 +6,43 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-require(dplyr)
+knitr::opts_chunk$set(echo = FALSE)
+require(dplyr) # data wrangling
+require(lubridate) # date functions
 setwd("~/Data-science/MovieLens")
 edx <- readRDS("edx.rds")
+options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
 ```
 
 ## Overview of capstone project 
 
+[Some text about this capstone project.]
 
-## EDX MovieLens dataset description
+## Dataset description
 
 The training dataset provided by HarvardX contains `r dim(edx)[1]` records and `r dim(edx)[2]` columns with:
+
 * `r n_distinct(edx$userId)` users,
 * `r n_distinct(edx$movieId)` movies,
 * `r n_distinct(edx$title)` titles, let's investigate how this can differ from number of movies,
-* `r n_distinct(edx$genres)` genres,
+* `r n_distinct(edx$genres)` unieke values in the genres column, muliple genres may apply to one genre,
 * `r n_distinct(edx$rating)`, ratings, in steps of 0.05 from 0 to 5
-* Periode from ... to ... ?
+
+The data spreads a timespam from `r min(as_datetime(edx$timestamp))` until `r max(as_datetime(edx$timestamp))`.
+
+```{r example, results="show"}
+head(edx, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
+```
+
 
 ## Descriptive statistics
 
 ```{r}
 
 ```
+
+## Data wrangling
+
 
 ## Exploratory data analysis
 
