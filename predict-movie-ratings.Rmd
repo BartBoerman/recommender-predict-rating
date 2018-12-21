@@ -9,8 +9,9 @@ output: pdf_document
 knitr::opts_chunk$set(echo = FALSE)
 require(dplyr) # data wrangling
 require(lubridate) # date functions
+require(stringr) # regex and other string expressions
 setwd("~/Data-science/MovieLens")
-edx <- readRDS("edx.rds")
+edx <- readRDS("edx.rds") # reload data
 options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
 ```
 
@@ -28,23 +29,97 @@ The training dataset provided by HarvardX contains `r dim(edx)[1]` records and `
 * `r n_distinct(edx$genres)` unieke values in the genres column, muliple genres may apply to one genre,
 * `r n_distinct(edx$rating)`, ratings, in steps of 0.05 from 0 to 5
 
-The data spreads a timespam from `r min(as_datetime(edx$timestamp))` until `r max(as_datetime(edx$timestamp))`.
+The data spreads a timespam from `r min(as_datetime(edx$timestamp, origin = "1970-01-01"))` until `r max(as_datetime(edx$timestamp, origin = "1970-01-01"))`.
 
 ```{r example, results="show"}
 head(edx, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
 ```
 
+Make note of the following:
+
+* The title seems to contain the release year of the movie.
+* The genre column contains multiple genres seperated with a pipe. 
+
 
 ## Descriptive statistics
 
+In addition to the quantative description of the dataset in the previous paragraph some basic statistics about ratings may be of interest. 
 ```{r}
 
 ```
 
+
+## Missing values
+
+The dataset has `r sum(is.na(edx))` records with missing values. Which is `r round((sum(is.na(edx))/sum(complete.cases(edx)))*100,2)` procent. We need to investigate.
+
+```{r}
+edx %>% summarise_all(funs((sum(is.na(.))/length(.))*100)) %>% round(.,2)  %>% knitr::kable(format = "pandoc", caption = "Percentage missing values per column") 
+```
+
+
+What ratings are given to these movies?
+
+```{r}
+table(edx %>% filter(is.na(title)) %>% select(rating)) %>% knitr::kable(format = "pandoc", caption = "Ratings on movies with missing meta data") 
+
+```
+
+The average rating is `r edx %>% filter(is.na(title)) %>% select(rating) %>% summarise(mean = mean(rating))`, which is almost equal to the overall average rating: `r mean(edx$rating)`. 
+
+Let's not ignore these cases.
+
 ## Data wrangling
+
+Feature engineering
+
+* year, month, day of week, hour
+```{r}
+edx <- edx %>% mutate(datetime = as_datetime(timestamp, origin = "1970-01-01")
+                      ,year = year(datetime)
+                      ,month = month(datetime)
+                      ,wday = wday(datetime, week_start = 1)
+                      ,hour = hour(datetime)
+                      )
+```
+* extract release year from title 
+```{r}
+pattern <- "[/(]\\d{4}[/)]$"
+edx <- edx %>% mutate(releaseyear = as.numeric(str_extract(str_extract(title, pattern), regex("\\d{4}")))
+                      ,title = str_remove(title, pattern)
+                      )
+```
+* one-hot encode genre
+```{r}
+genres <- c("Action","Adventure","Animation","Children","Comedy","Crime","Documentary","Drama","Fantasy","Film-Noir","Horror","Musical","Mystery","Romance","Sci-Fi","Thriller","War","Western")
+
+edx <- edx %>% mutate(Children = if_else("Children" %in% .genres,1,0)) 
+```
+
+
+* add number of ratings per movie
+```{r}
+edx <- edx %>%
+                    group_by(movieId) %>% 
+                    mutate(n_users = n()) %>%
+                    ungroup
+```
+
+* add number of rating per user 
+```{r}
+edx <- edx %>%
+                    group_by(userId) %>% 
+                    mutate(n_movies = n()) %>%
+                    ungroup
+```
+
+
 
 
 ## Exploratory data analysis
+```{r}
+
+```
 
 
 
