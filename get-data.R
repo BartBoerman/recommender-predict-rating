@@ -46,7 +46,9 @@ edx <- rbind(edx, removed)
 # Learners will develop their algorithms on the edx set
 # For grading, learners will run algorithm on validation set to generate ratings
 
+validation.y <- validation %>% select(rating) ## added by Bart Boerman. First test accuracy then submit final model.
 validation <- validation %>% select(-rating)
+
 
 # Ratings will go into the CSV submission file below:
 
@@ -65,3 +67,5 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 # Refer to: http://www.sthda.com/english/wiki/saving-data-into-r-data-format-rds-and-rdata
 
 saveRDS(edx, "edx.rds")
+saveRDS(validation, "validation.rds")
+saveRDS(validation.y, "validation.y.rds")

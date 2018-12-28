@@ -7,9 +7,12 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+require(caret) # data science toolkit
 require(dplyr) # data wrangling
 require(lubridate) # date functions
 require(stringr) # regex and other string expressions
+require(ggplot2) # data visualisation
+require(xgboost)
 setwd("~/Data-science/MovieLens")
 edx <- readRDS("edx.rds") # reload data
 options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
@@ -67,59 +70,244 @@ table(edx %>% filter(is.na(title)) %>% select(rating)) %>% knitr::kable(format =
 
 The average rating is `r edx %>% filter(is.na(title)) %>% select(rating) %>% summarise(mean = mean(rating))`, which is almost equal to the overall average rating: `r mean(edx$rating)`. 
 
-Let's not ignore these cases.
-
 ## Data wrangling
 
-Feature engineering
+### Impute Missing values
+
+We impute genres with "genre unknown" and title with arbitrary "title unknown (1994)". 1994 is the median for release year which we will extract from title during feature engineering.  
+
+### Feature engineering
 
 * year, month, day of week, hour
+* extract release year from title 
+* number of genres per movie
+* one-hot encode genre (apply when not performing PCA)
+* add mean rating per genre, movie and user
+* add number of ratings per movie
+* add number of rating per user 
 ```{r}
+# impute missing values
+edx <- edx %>% mutate(titleUnknown = if_else(is.na(title),1,0)
+                      ,title = if_else(is.na(title),"title unknown (1994)", title)
+                      ,genres = if_else(is.na(genres),"genre unknown", genres)
+)
+# year, month, day of week, hour
 edx <- edx %>% mutate(datetime = as_datetime(timestamp, origin = "1970-01-01")
                       ,year = year(datetime)
                       ,month = month(datetime)
                       ,wday = wday(datetime, week_start = 1)
                       ,hour = hour(datetime)
                       )
-```
-* extract release year from title 
-```{r}
+# extract release year from title 
 pattern <- "[/(]\\d{4}[/)]$"
 edx <- edx %>% mutate(releaseyear = as.numeric(str_extract(str_extract(title, pattern), regex("\\d{4}")))
                       ,title = str_remove(title, pattern)
                       )
-```
-* one-hot encode genre
-```{r}
+# number of genres per movie
+edx <- edx %>% mutate(n_genres = str_count(genres,"[|]") + 1)
+# one-hot encode genre (apply when not performing PCA)
 genres <- c("Action","Adventure","Animation","Children","Comedy","Crime","Documentary","Drama","Fantasy","Film-Noir","Horror","Musical","Mystery","Romance","Sci-Fi","Thriller","War","Western")
-
-
-```
-
-
-* add number of ratings per movie
-```{r}
+ 
+for (g in genres ){
+   edx[[g]] <- str_count(edx$genres,g) 
+}
+# add mean rating per genre, movie and user
+edx <- edx %>%
+                    group_by(genres) %>% 
+                    mutate(mean_genre = mean(rating)) %>%
+                    ungroup
+edx <- edx %>%
+                    group_by(movieId) %>% 
+                    mutate(mean_movie = mean(rating)) %>%
+                    ungroup
+edx <- edx %>%
+                    group_by(userId) %>% 
+                    mutate(mean_user = mean(rating)) %>%
+                    ungroup
+# add number of ratings per movie
 edx <- edx %>%
                     group_by(movieId) %>% 
                     mutate(n_users = n()) %>%
                     ungroup
-```
 
-* add number of rating per user 
-```{r}
+# add number of rating per user
 edx <- edx %>%
                     group_by(userId) %>% 
                     mutate(n_movies = n()) %>%
                     ungroup
+
+
+```
+
+## Exploratory data analysis
+
+We are want to predict the ratings per user per movie. So let's explore questions like:
+* does the day of the week impact the rating?
+* are populair movies rated higher then others?
+* more genres, higher ratings?
+
+
+
+```{r}
+# 
+# edx_wday <- edx %>% 
+#                     group_by(wday) %>%
+#                     select(wday, rating) %>%
+#                     summarise(avg = mean(rating), median = median(rating), n = n())
+# edx_releaseyear <- edx %>% 
+#                       group_by(releaseyear) %>%
+#                       select(releaseyear, rating, userId, movieId) %>%
+#                       summarise(avg = mean(rating), median = median(rating), n_user = n_distinct(userId), n_movie =  n_distinct(movieId))
+# 
+# edx_n_genres <- edx %>% 
+#                     group_by(n_genres) %>%
+#                     select(n_genres, rating) %>%
+#                     summarise(avg = mean(rating), median = median(rating),   n = n())
+```
+
+## Feature selection
+
+```{r}
+
+# train matrix
+train.x <- edx %>% select(-timestamp, - title, -genres, -datetime, -rating) 
+train.x <- train.x %>% mutate_all(funs(as.numeric(.)))
+# We must convert factors to numeric
+# They must be starting from number 0 to use multiclass
+# For instance: 0, 1, 2, 3, 4...
+y <- as.numeric(as.factor(edx$rating)) - 1
+xgb_train <- xgb.DMatrix(data = as.matrix(train.x), label = y)
+
+```
+# Reduce dimensionality
+
+If we do not hot encode genres then we can redure the number of features to 11 with PCA. PCA needs 11 variables to explain 91,57 of the variance in the dataset. Runtime is reduced from 5 to 2 hours (25 rounds).
+
+```{r}
+
+# train.x.pca <- prcomp(train.x, center = TRUE,scale. = TRUE)
+# summary(train.x.pca)
+# xgb_train <- xgb.DMatrix(data = train.x.pca$x[,1:11], label = y) # prcomp delivers a matrix
+# rm(train.x)
+# gc()
+```
+
+
+# xgboost multi classification
+
+```{r}
+# Set parameters(default)
+Sys.time()
+numberOfClasses <- length(unique(y))
+params <- list(booster = "gbtree", 
+               objective = "multi:softprob",
+               num_class = numberOfClasses, 
+               eval_metric = "merror", # Multiclass classification error rate. It is calculated as #(wrong cases)/#(all cases).
+               nthread = 4,
+               max_depth = 6, 
+               min_child_weight = 10,
+               subsample = 1.0,
+               eta = 0.3, 
+               gamma = 0
+               )
+# Calculate # of folds for cross-validation
+# xgbcv <- xgb.cv(params = params, 
+#                 data = xgb_train, 
+#                 nrounds = 25, # default is 100, but lower is better for runtime 
+#                 nfold = 3, 
+#                 showsd = FALSE, 
+#                 stratified = TRUE, 
+#                 print_every_n = 5, 
+#                 early_stop_round = 1, # chosen low value for better runtime 
+#                 maximize = FALSE, 
+#                 prediction = FALSE) # save memory by not saving predictions
+set.seed(1413)
+xgb <- xgb.train(params = params, 
+                 data = xgb_train,
+                 nround=50)
+
+Sys.time()
+saveRDS(xgb, "xgb.rds")
+Sys.time()
 ```
 
 
 
+```{r}
+xgb <- readRDS("xgb.rds")
+meta_user <- edx %>% select(userId, mean_user, n_movies) %>% distinct
+meta_movie <- edx %>% select(movieId, releaseyear, n_genres, mean_genre, mean_movie, n_users) %>% distinct
 
-## Exploratory data analysis
+validation.y <- readRDS("validation.y.rds") # reload data
+validation.y$rating <- as.numeric(as.factor(validation.y$rating)) - 1
+saveRDS(validation.y, "validation.y.rds")
+validation <-readRDS("validation.rds") # reload data
+
+validation <- left_join(x = validation, y = meta_user, by = "userId")
+validation <-  left_join(x = validation, y = meta_movie, by = "movieId")
+
+# impute missing values
+validation <- validation %>% mutate(titleUnknown = if_else(is.na(title),1,0))
+
+# year, month, day of week, hour
+validation <- validation %>% mutate(datetime = as_datetime(timestamp, origin = "1970-01-01")
+                      ,year = year(datetime)
+                      ,month = month(datetime)
+                      ,wday = wday(datetime, week_start = 1)
+                      ,hour = hour(datetime)
+                      )
+for (g in genres ){
+   validation[[g]] <- str_count(validation$genres,g) 
+}
+
+
+validation.x <- validation %>% select(names(train.x)) 
+validation.x <- validation.x %>% mutate_all(funs(as.numeric(.)))
+
+# validation.x.pca <- predict(train.x.pca, validation.x)
+
+saveRDS(validation.x, "validation.x.rds")
+
+#xgb_validation <- xgb.DMatrix(data = validation.x.pca[,1:11]) 
+xgb_validation <- xgb.DMatrix(data = as.matrix(validation.x))
+# https://rpubs.com/mharris/multiclass_xgboost
+
+prediction <- predict(xgb,  newdata = xgb_validation)
+
+prediction <- matrix(prediction, nrow = numberOfClasses,
+                           ncol=length(prediction)/numberOfClasses) %>%
+                           t() %>%
+                           data.frame() %>%
+                           mutate(observed     = validation.y$rating + 1,
+                                  predicted    = max.col(., "first"))
+
+# confusion matrix of validation set
+confusionMatrix(factor(prediction$predicted),
+                factor(prediction$observed),
+                mode = "everything")
+
+
+```
+
+```{r}
+# get the feature real names
+names <-  colnames(train.x)
+# compute feature importance matrix
+importance_matrix = xgb.importance(feature_names = names, model = xgb)
+head(importance_matrix)
+```
+```{r}
+# plot
+gp = xgb.ggplot.importance(importance_matrix)
+print(gp) 
+```
+
+
 ```{r}
 
 ```
+
+
 
 
 
