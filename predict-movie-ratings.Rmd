@@ -108,9 +108,11 @@ edx <- edx %>% mutate(n_genres = str_count(genres,"[|]") + 1)
 # one-hot encode genre (apply when not performing PCA)
 genres <- c("Action","Adventure","Animation","Children","Comedy","Crime","Documentary","Drama","Fantasy","Film-Noir","Horror","Musical","Mystery","Romance","Sci-Fi","Thriller","War","Western")
  
-for (g in genres ){
-   edx[[g]] <- str_count(edx$genres,g) 
-}
+#for (g in genres ){
+#   edx[[g]] <- str_count(edx$genres,g) 
+#}
+
+edx$genres <- as.factor(edx$genres)
 # add mean rating per genre, movie and user
 edx <- edx %>%
                     group_by(genres) %>% 
@@ -135,8 +137,6 @@ edx <- edx %>%
                     group_by(userId) %>% 
                     mutate(n_movies = n()) %>%
                     ungroup
-
-
 ```
 
 ## Exploratory data analysis
@@ -170,7 +170,7 @@ We are want to predict the ratings per user per movie. So let's explore question
 ```{r}
 
 # train matrix
-train.x <- edx %>% select(-timestamp, - title, -genres, -datetime, -rating) 
+train.x <- edx %>% select(-timestamp, - title, -datetime, -rating)  # -genres
 train.x <- train.x %>% mutate_all(funs(as.numeric(.)))
 # We must convert factors to numeric
 # They must be starting from number 0 to use multiclass
@@ -204,7 +204,7 @@ params <- list(booster = "gbtree",
                num_class = numberOfClasses, 
                eval_metric = "merror", # Multiclass classification error rate. It is calculated as #(wrong cases)/#(all cases).
                nthread = 4,
-               max_depth = 6, 
+               max_depth = 4, 
                min_child_weight = 10,
                subsample = 1.0,
                eta = 0.3, 
@@ -224,10 +224,10 @@ params <- list(booster = "gbtree",
 set.seed(1413)
 xgb <- xgb.train(params = params, 
                  data = xgb_train,
-                 nround=50)
+                 nround=100)
 
 Sys.time()
-saveRDS(xgb, "xgb.rds")
+saveRDS(xgb, "xgb.rds") # 0.3758 
 Sys.time()
 ```
 
@@ -235,8 +235,8 @@ Sys.time()
 
 ```{r}
 xgb <- readRDS("xgb.rds")
-meta_user <- edx %>% select(userId, mean_user, n_movies) %>% distinct
-meta_movie <- edx %>% select(movieId, releaseyear, n_genres, mean_genre, mean_movie, n_users) %>% distinct
+meta_user <- train.x %>% select(userId, mean_user, n_movies) %>% distinct
+meta_movie <- train.x %>% select(-userId, -mean_user, -n_movies, -year, -month, -wday, -hour) %>% distinct
 
 validation.y <- readRDS("validation.y.rds") # reload data
 validation.y$rating <- as.numeric(as.factor(validation.y$rating)) - 1
@@ -244,6 +244,7 @@ saveRDS(validation.y, "validation.y.rds")
 validation <-readRDS("validation.rds") # reload data
 
 validation <- left_join(x = validation, y = meta_user, by = "userId")
+validation$genres <- NULL
 validation <-  left_join(x = validation, y = meta_movie, by = "movieId")
 
 # impute missing values
@@ -256,9 +257,9 @@ validation <- validation %>% mutate(datetime = as_datetime(timestamp, origin = "
                       ,wday = wday(datetime, week_start = 1)
                       ,hour = hour(datetime)
                       )
-for (g in genres ){
-   validation[[g]] <- str_count(validation$genres,g) 
-}
+#for (g in genres ){
+#   validation[[g]] <- str_count(validation$genres,g) 
+#}
 
 
 validation.x <- validation %>% select(names(train.x)) 
@@ -308,6 +309,12 @@ print(gp)
 ```
 
 
+```{r}
+set.seed(400)
+ctrl <- trainControl(method="repeatedcv",repeats = 3) #,classProbs=TRUE,summaryFunction = twoClassSummary)
+
+knnFit <- train(Direction ~ ., data = training, method = "knn", trControl = ctrl, preProcess = c("center","scale"), tuneLength = 20)
+```
 
 
 
