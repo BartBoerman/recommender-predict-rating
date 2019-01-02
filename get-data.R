@@ -19,7 +19,7 @@ ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ra
 
 movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
 colnames(movies) <- c("movieId", "title", "genres")
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
                                            title = as.character(title),
                                            genres = as.character(genres))
 
@@ -48,7 +48,6 @@ edx <- rbind(edx, removed)
 
 validation.y <- validation %>% select(rating) ## added by Bart Boerman. First test accuracy then submit final model.
 validation <- validation %>% select(-rating)
-
 
 # Ratings will go into the CSV submission file below:
 
