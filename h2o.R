@@ -115,6 +115,7 @@ for (g in genres ){
                       select(userId, !! varNameMode) %>%
                       distinct
       edx <- left_join(x = edx, y = tmp, by = "userId")
+      edx <- edx %>% mutate(!! as.name(varNameDummy) := if_else(!! as.name(varNameDummy) == 1,!! as.name(varNameMode),0))
       rm(tmp)
 }
 edx <- edx %>% replace(., is.na(.), 0) # impute NA caused by left joins (users who dit not rate specific genres)
@@ -129,17 +130,17 @@ edx <- edx %>%
                       ungroup
 edx <- edx %>%
                       group_by(userId) %>% 
-                      mutate(user_mode_user = f_mode(rating)) %>%
+                      mutate(usr_mode_user = f_mode(rating)) %>%
                       ungroup
 # Add number of ratings per movie
 edx <- edx %>%
                       group_by(movieId) %>% 
-                      mutate(movie_n__users = n()) %>%
+                      mutate(movie_n_users = n()) %>%
                       ungroup
 # Add number of ratings per user
 edx <- edx %>%
                       group_by(userId) %>% 
-                      mutate(user_n_movies = n()) %>%
+                      mutate(usr_n_movies = n()) %>%
                       ungroup
 ####################################################################################
 # Generate meta data sets                                                          #
@@ -147,14 +148,13 @@ edx <- edx %>%
 ####################################################################################
 meta_movie <- edx %>% 
                       select(-userId, -rating, -timestamp, -datetime, -year, -month) %>% 
-                      select(movieId, title, genres, movie_releaseyear, movie_n_genres, movie_mode_movie, movie_mode_genre, movie_n__users, matches("movie_dummy")) %>%
+                      select(movieId, title, genres, movie_releaseyear, movie_n_genres, movie_mode_movie, movie_mode_genre, movie_n_users, matches("movie_dummy")) %>%
                       distinct
 x <- names(meta_movie)
 meta_user <- edx %>% 
                       select(-rating, -timestamp, -datetime, -year, -month) %>% 
                       select(-x, userId) %>% 
                       distinct
-meta_user <- meta_user %>% select(userId, user_mode_Thriller) %>% distinct()
 ####################################################################################
 # Start script from this point if you already completed data wrangling             #    
 ####################################################################################
@@ -173,9 +173,9 @@ h2o.init(max_mem_size = "8G", #
 # Get data into cloud                                                              #    
 ####################################################################################
 # Note: this can take some minutes, time for coffee
-drop <- c("timestamp","datetime","movieId","userId","title","genres","month")
+drop <- c("timestamp","datetime","title","month")
 
-train_h2o <- as.h2o(edx %>% select(-drop), 
+train_h2o <- as.h2o(edx %>% select(-drop, -matches("user_mode")), 
                             destination_frame = "train") # name in h2o cloud
 
                     
@@ -196,13 +196,13 @@ xgb_h2o <- h2o.xgboost(x = x,
                        y = y,
                        training_frame = train_h2o,
                        distribution = "AUTO",
-                       ntrees = 25, # nround
-                       max_depth = 6,
+                       ntrees = 50, # nround
+                       max_depth = 4,
                        learn_rate = 0.3, # eta
                        gamma = 0,
-                       min_rows = 10,
+                       min_rows = 4,
                        stopping_rounds = 2,
-                       stopping_metric = "misclassification", # 0.6493718 (mean) 0.7051093 (mode, also without genre)
+                       stopping_metric = "misclassification", 
                        stopping_tolerance = 0.001,
                        nfolds = 2,
                        fold_assignment = "Stratified",
@@ -217,23 +217,23 @@ varimp_xgb_h2o <- h2o.varimp(xgb_h2o)
 tree <- h2o.getModelTree(model = xgb_h2o, tree_number = 1, tree_class = "NO")
 
 # https://htmlpreview.github.io/?https://github.com/ledell/sldm4-h2o/blob/master/sldm4-deeplearning-h2o.html
-# Sys.time()
-# dnn_h2o <- h2o.deeplearning(x = x,
-#                             y = y,
-#                             training_frame = train_h2o,
-#                             epochs = 10,
-#                             hidden = c(10,10),
-#                             input_dropout_ratio = 0.1,
-#                             distribution = "AUTO",
-#                             nfolds = 3,                            
-#                             score_interval = 1,                    
-#                             stopping_rounds = 2,                   #used for early stopping
-#                             stopping_metric = "misclassification", #used for early stopping
-#                             stopping_tolerance = 0.01,             #1e-3  #used for early stopping
-#                             standardize = TRUE,
-#                             keep_cross_validation_predictions = FALSE,
-#                             model_id = "dnn_h2o",
-#                             seed = 1413)
+Sys.time()
+dnn_h2o <- h2o.deeplearning(x = x, #  0.38528666
+                            y = y,
+                            training_frame = train_h2o,
+                            epochs = 50,
+                            hidden = c(50,50,50),
+                            input_dropout_ratio = 0.1,
+                            distribution = "AUTO",
+                            nfolds = 3,
+                            score_interval = 1,
+                            stopping_rounds = 3,                   #used for early stopping
+                            stopping_metric = "misclassification", #used for early stopping
+                            stopping_tolerance = 1e-3,             #1e-3  #used for early stopping
+                            standardize = TRUE,
+                            keep_cross_validation_predictions = FALSE,
+                            model_id = "dnn_h2o",
+                            seed = 1413)
 # h2o.saveModel(dnn_h2o)
 # Sys.time()
 #h2o.shutdown()
@@ -247,6 +247,8 @@ test <- readRDS("test.rds") %>% mutate(datetime = lubridate::as_datetime(timesta
                                         ,year = lubridate::year(datetime)
                                         ,month = lubridate::month(datetime)) %>%
                                 select(userId, movieId, rating, year, month)
+meta_movie <- readRDS("meta_movie.rds") 
+meta_user <- readRDS("meta_user.rds") 
 # Add meta data about movies and users
 test <- left_join(x = test, y = meta_user, by = "userId")
 test <- left_join(x = test, y = meta_movie, by = "movieId")
