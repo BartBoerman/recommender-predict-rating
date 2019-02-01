@@ -1,0 +1,111 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    latex_engine: pdflatex
+    template: ~/Data-science/MovieLens/svm-latex-ms.tex
+title: "Building a recommender system with R"
+author: "Bart Boerman"
+abstract: "This paper is a deliverable of the capstone project in the 'Professional Certificate in Data Science' course hosted by Harvard University (HarvardX). The main task of a recommender system is to predict the users responce to different options. This document provides an example for predicting how a user would rate unseen movies. GroupLens Research has collected and made available rating data sets from the MovieLens web site. A data set with 10 million rows is split into a train (90%) and a 'unseen' test (10%) set for evaluation. The evaluation metric is RMSE."
+keywords: "recommendation, collaborative filtering, R, recosystem, matrix factorization"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 11pt
+spacing: double
+endnote: no
+---
+
+```{r setup, include=FALSE}
+# https://github.com/svmiller/svm-r-markdown-templates/blob/master/svm-latex-statement.tex
+knitr::opts_chunk$set(echo = FALSE)
+# Data wrangling
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+# Calculate evaluation metrics
+if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-project.org")
+setwd("~/Data-science/MovieLens")
+train <- readRDS("train.rds") # reload data
+options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
+```
+
+# Acknowledgements and further readings
+
+
+
+# Populair approaches for designing a recommender system
+
+* *Content-Based systems* analyse the characteristics of items. Similarity of items is determined by measuring the similarity in their properties. Content-based filtering recommends items based on a comparison between the content of the items and a user profile. The content of each item is represented as a set of descriptors or tags given to the item by users. The user profile is represented with the same descriptors and built up by analyzing the content of items which have been seen by the user.
+
+* *Collaborative-Filtering systems* analyse the relationship between users and items. The underlying assumption of the collaborative filtering approach is that if a person A has the same opinion as a person B on an issue, A is more likely to have B's opinion on a different issue than that of a randomly chosen person.
+
+# This paper
+I've chosen collaborative-filtering approache, since the data, as specified within the capstone project, contains a limited set of meta data, does not contain the required user tags nor does it contain details about the users.
+
+# Matrix Factorization
+
+Collaborative-Filtering systems use an user-item matrix as a basis to identify similarity between relationships.
+
+```{r example, results="show"}
+User <- c('US_1','US_2','US_3')
+Movie_1 <- c(NA,NA,5)
+Movie_2 <- c(1,NA,4)
+as.matrix(cbind(User,Movie_1,Movie_2)) %>% knitr::kable(format = "pandoc", caption = "User-item matrix") 
+```
+
+# The MovieLens Dataset 
+GroupLens Research has collected and made available rating data sets from the MovieLens web site. A data set with 10 million rows is split into a train (90%) and a 'unseen' test (10%) set for evaluation.
+
+## Description
+The training dataset contains `r dim(train)[1]` records and `r dim(train)[2]` columns with:
+
+* `r n_distinct(train$userId)` user id's,
+* `r n_distinct(train$movieId)` movie id's with title and genre,
+* `r n_distinct(train$genres)` unieke values in the genres column, muliple genres may apply to one movie,
+* `r n_distinct(train$rating)`, ratings, in steps of 0.05 from 0 to 5 so 10 possible outcomes.
+
+The data spreads a timespam from `r min(as_datetime(train$timestamp, origin = "1970-01-01"))` until `r max(as_datetime(train$timestamp, origin = "1970-01-01"))`.
+
+```{r example, results="show"}
+head(train, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
+```
+
+Notes:
+
+* The title contains the release year of the movie.
+* The genre column contains multiple genres seperated with a pipe. 
+
+
+## Descriptive statistics
+
+In addition to the quantative description of the dataset in the previous paragraph some basic statistics about ratings may be of interest. 
+```{r}
+
+```
+
+## Missing values
+The dataset has `r sum(is.na(train))` records with missing values. 
+
+```{r}
+# Which is `r round((sum(is.na(train))/sum(complete.cases(train)))*100,2)` procent. 
+train %>% summarise_all(funs((sum(is.na(.))/length(.))*100)) %>% round(.,2)  %>% knitr::kable(format = "pandoc", caption = "Percentage missing values per column") 
+```
+
+## Feature engineering
+A Collaborative-Filtering recommendation system uses a matrix of users, movies and ratings as values. Thus, further feature engineering is not required. One might consider the engineering of the following derived features when building a Content-Based recommendation system:  
+
+* Date attributes: year, month, day of week, hour. 
+* Release year (included in the title text). 
+* Number of genres per movie.
+* One-hot encoding of genres.
+* Add mean, median and or mode of rating per genre, movie and user.
+* Add number of ratings per movie.
+* Add number of rating per user.
+
+
+
+
+
+
