@@ -18,18 +18,24 @@ spacing: double
 endnote: no
 ---
 
-```{r setup, include=FALSE}
-# https://github.com/svmiller/svm-r-markdown-templates/blob/master/svm-latex-statement.tex
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+# Document option
+options(tinytex.verbose = TRUE)
 knitr::opts_chunk$set(echo = FALSE)
-# Data wrangling
-if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
-if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
-# Calculate evaluation metrics
-if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-project.org")
-setwd("~/Data-science/MovieLens")
-train <- readRDS("train.rds") # reload data
+# New page function
+doc_pagebreak <- function() {
+  if(knitr::is_latex_output())
+    return("\\newpage")
+  else
+    return('<div style="page-break-before: always;" />')
+}
+# figure options
 options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
+# Execute script in external file. Objects will be loaded into environment.
+source('predict-movie-ratings.R', echo = FALSE, verbose = FALSE)
 ```
+
+
 
 # Acknowledgements and further readings
 
@@ -68,7 +74,7 @@ The training dataset contains `r dim(train)[1]` records and `r dim(train)[2]` co
 
 The data spreads a timespam from `r min(as_datetime(train$timestamp, origin = "1970-01-01"))` until `r max(as_datetime(train$timestamp, origin = "1970-01-01"))`.
 
-```{r example, results="show"}
+```{r example2, results="show"}
 head(train, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
 ```
 

@@ -3,6 +3,7 @@
 ####################################################################################
 # Data wrangling
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
 # Calculate evaluation metrics
 if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-project.org")
 # Functions to streamline the model training process for complex regression and classification problems. 
@@ -36,52 +37,45 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))
 
 movielens <- left_join(ratings, movies, by = "movieId")
 
-# Validation set will be 10% of MovieLens data
+# Test set will be 10% of MovieLens data
 
-set.seed(1)
+set.seed(1, sample.kind = "Rounding")
 test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
 
-# Make sure userId and movieId in validation set are also in edx set
+# Make sure userId and movieId in test set are also in edx set
 
-test <- temp %>%     # Renamed to validation to test because some models require train, validation and test data sets. Where validation is used during training.
-  semi_join(edx, by = "movieId") %>%
-  semi_join(edx, by = "userId")
+test <- temp %>%     
+            semi_join(edx, by = "movieId") %>%
+            semi_join(edx, by = "userId")
 
 # Add rows removed from test set back into edx set
-
 removed <- anti_join(temp, test)
-edx <- rbind(edx, removed) # original data set
-train <- edx # data set to be used for training a model     
-# Write data to R data file, so we can restart this script without rerunning the extraction process.
-# The edx dataset is kept as the original data set.
-# The train dataset is used for training.
-saveRDS(edx, "edx.rds")
-saveRDS(train, "train.rds")
-saveRDS(test, "test.rds")
-
+# Data to be used for training a model
+train <- rbind(edx, removed)      
+# Housekeeping
 rm(dl, edx, ratings, movies, test_index, temp, movielens, removed)
 gc()
 ########################################################################################################
-# Load train data in memory                                                                            #   
+# Load train data in memory with data_memory function from recosystem                                  #   
 ########################################################################################################
-# The recommender system, libmf,  
-train = train <- readRDS("train.rds") %>% 
-                        select(userId, movieId, rating) %>%
-                        mutate(userId = as.integer(userId)
-                               ,movieId = as.integer(movieId)
-                               ,rating = as.integer(rating * 2))
+train <- train  %>%  select(userId, movieId, rating) %>%
+                     mutate(userId = as.integer(userId)
+                           ,movieId = as.integer(movieId)
+                           ,rating = as.integer(rating * 2))
 
-trainMemory = data_memory(user_index = train$userId,
+trainMemory <- data_memory(user_index = train$userId,
                           item_index = train$movieId,
                           rating = train$rating, index1 = TRUE)
 ########################################################################################################
 # Tune model                                                                                           #   
 ########################################################################################################
-# Constructing a Recommender System Object
+# Constructing a Recommender System Object (based on LIBMF, National Taiwan University).
 recommender <- Reco()
-# Uses cross validation to tune the model parameters
+# Recommender uses cross validation to find the optimal parameters.
+# I simplified the process by limiting the number of values to be tested as parameter. 
+# The training process will consume a lot of time. Please take a break.
 opts <- recommender$tune(trainMemory, 
                                   opts = list(
                                           dim      = c(65), # number of latent factors    
@@ -91,40 +85,42 @@ opts <- recommender$tune(trainMemory,
                                           costq_l1 = 0, # L1 regularization cost for item factors                           
                                           lrate    = c(0.01, 0.1), # learning rate, which can be thought of as the step size in gradient descent.          
                                           nthread  = 4,  # number of threads for parallel computing
-                                          nfold = 5, # number of folds in cross validation.  
+                                          nfold = 5, # number of folds in cross validation  
                                           niter    = 10, #  number of iterations
                                           verbose  = FALSE))
 ########################################################################################################
 # Train the recommender model using optimal parameters                                                 #   
 ########################################################################################################
-
-recommender$train(trainMemory, 
-                                opts = c(opts$min,                    
-                                         niter = 100, nthread = 4)) 
-
-rm(trainMemory)
-
-test <- readRDS("test.rds") %>% 
-                      select(userId, movieId, rating) %>%
-                      mutate(userId = as.integer(userId)
-                             ,movieId = as.integer(movieId)
-                             ,rating = as.integer(rating * 2))
+# Train the recommender with the optimized parameters.
+# This beast needs be fed with a lot of iterations to train for a competitive accuracy.
+recommender$train(trainMemory, opts = c(opts$min, # optimized parameters                     
+                                        niter = 100, # iterations 
+                                        nthread = 4)) # number of threads 
+# Housekeeping
+rm(train, trainMemory, opts)
+gc()
+########################################################################################################
+# Load test data in memory                                                                             #   
+########################################################################################################
+test <- test %>% select(userId, movieId, rating) %>%
+                 mutate(userId = as.integer(userId)
+                       ,movieId = as.integer(movieId)
+                       ,rating = as.integer(rating * 2))
 
 testMemory <- data_memory(user_index = test$userId, 
                           item_index = test$movieId, 
                           rating = test$rating, index1 = T)  
 ########################################################################################################
-# Predict rating                                                                                       #   
+# Predict rating on test data                                                                          #   
 ########################################################################################################
-
 test$prediction <- recommender$predict(testMemory, out_memory())
 # The system will predict extremes minus 0 and plus 10, which are out of range. 
 # A tiny RMSE improvement can be achieved as follows:
 test <- test %>% mutate(prediction = case_when(prediction < 0 ~ 0, prediction > 10 ~ 10, TRUE ~ prediction) ) 
-
 ########################################################################################################
 # Root Mean Square Error (RMSE)                                                                        #
 ########################################################################################################
 # RMSE = sqrt(mean((observed - predicted) ^ 2))
 # The RMSE is arround 0.778
-rmse(test$rating / 2, test$prediction / 2) 
+RMSE <- rmse(test$rating / 2, test$prediction / 2) 
+print(RMSE)
