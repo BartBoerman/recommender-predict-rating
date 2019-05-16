@@ -1,14 +1,14 @@
 ####################################################################################
 # Required packages                                                                #   
 ####################################################################################
-# Data wrangling
+# Data wrangling.
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
-# Calculate evaluation metrics
+# Calculate evaluation metrics.
 if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-project.org")
 # Functions to streamline the model training process for complex regression and classification problems. 
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
-# Recommender system using Matrix Factorization, R wrapper of the 'libmf' library
+# Recommender system using Matrix Factorization, R wrapper of the 'libmf' library.
 if(!require(recosystem)) install.packages("recosystem", repos = "http://cran.us.r-project.org")
 ####################################################################################
 # About recosystem                                                                 #    
