@@ -44,7 +44,7 @@ if (!exists("train") | !exists("test")){
                                              genres = as.character(genres))
   movielens <- left_join(ratings, movies, by = "movieId")
   # !!!!! Line to test on smaller dataset !!!!!.
-  #movielens <- head(movielens, 1000000)
+  #movielens <- head(movielens, 10000)
   
   # Test set will be 10% of MovieLens data
   

@@ -1,21 +1,23 @@
 ---
-output: 
-  pdf_document:
-    citation_package: natbib
-    keep_tex: true
-    fig_caption: true
-    latex_engine: pdflatex
-    template: ~/Data-science/MovieLens/svm-latex-ms.tex
 title: "Building a recommender system with R"
 author: "Bart Boerman"
-abstract: "This paper is a deliverable of the capstone project in the 'Professional Certificate in Data Science' course hosted by Harvard University (HarvardX). The main task of a recommender system is to predict the users responce to different options. This document provides an example for predicting how a user would rate unseen movies. GroupLens Research has collected and made available rating data sets from the MovieLens web site. A data set with 10 million rows is split into a train (90%) and a 'unseen' test (10%) set for evaluation. The evaluation metric is RMSE."
-keywords: "recommendation, collaborative filtering, R, recosystem, matrix factorization"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
-geometry: margin=1in
+output:
+  pdf_document:
+    citation_package: natbib
+    fig_caption: yes
+    keep_tex: yes
+    latex_engine: pdflatex
+    template: svm-latex-ms.tex
+  word_document: default
 fontfamily: mathpazo
 fontsize: 11pt
-spacing: double
+geometry: margin=1in
+keywords: recommendation, collaborative filtering, LIBMF, matrix factorization, R
 endnote: no
+spacing: double
+abstract: "The main task of a recommender system is to predict the users response to different options. GroupLens Research has collected and made available rating data sets from the MovieLens web site. A data set with 10 million rows is downloaded and split into a train (90%) and a ‘unseen’ test (10%) set for evaluation.  This document is a deliverable of the first of two capstone projects in the ‘Professional Certificate in Data Science’ course hosted by Harvard University (HarvardX). I followed a CRISP-DM like process: a short background study about content-based versus collaborative-filtering, analyze and prepare data, configure machine learning model and evaluate the results. The evaluation statistic is root-mean-squared error (RMSE) and must be lower than 0.8775 to be rewarded with the maximum grade. This is achieved by applying a collaborative filtering method."
+
 ---
 
 ```{r setup, include=FALSE, warning=FALSE, message=FALSE}
@@ -24,10 +26,10 @@ options(tinytex.verbose = TRUE)
 knitr::opts_chunk$set(echo = FALSE)
 # New page function
 doc_pagebreak <- function() {
-  if(knitr::is_latex_output())
-    return("\\newpage")
-  else
-    return('<div style="page-break-before: always;" />')
+                      if(knitr::is_latex_output())
+                        return("\\newpage")
+                      else
+                        return('<div style="page-break-before: always;" />')
 }
 # figure options
 options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "**")
@@ -35,81 +37,122 @@ options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "*
 source('predict-movie-ratings.R', echo = FALSE, verbose = FALSE)
 ```
 
+# Popular approaches for designing a recommender system
 
+* **Content-Based systems** analyse the characteristics of items. Similarity of items is determined by measuring the similarity in their properties. Content-based filtering recommends items based on a comparison between the content of the items and a user profile. The content of each item is represented as a set of descriptors or tags given to the item by users. The user profile is represented with the same descriptors and built up by analyzing the content of items which have been seen by the user.
 
-# Acknowledgements and further readings
+* **Collaborative-Filtering systems** analyse the relationship between users and items. The underlying assumption of the collaborative filtering approach is that if person A has the same opinion as person B on an issue, A is more likely to have B’s opinion on a different issue than that of a randomly chosen person.
 
+I’ve chosen collaborative-filtering approach, since the data, as specified within the capstone project, contains a limited set of meta data. For example, it does not contain user tags nor does it contain information about director, budget or cast of the movies.
 
-
-# Populair approaches for designing a recommender system
-
-* *Content-Based systems* analyse the characteristics of items. Similarity of items is determined by measuring the similarity in their properties. Content-based filtering recommends items based on a comparison between the content of the items and a user profile. The content of each item is represented as a set of descriptors or tags given to the item by users. The user profile is represented with the same descriptors and built up by analyzing the content of items which have been seen by the user.
-
-* *Collaborative-Filtering systems* analyse the relationship between users and items. The underlying assumption of the collaborative filtering approach is that if a person A has the same opinion as a person B on an issue, A is more likely to have B's opinion on a different issue than that of a randomly chosen person.
-
-# This paper
-I've chosen collaborative-filtering approache, since the data, as specified within the capstone project, contains a limited set of meta data, does not contain the required user tags nor does it contain details about the users.
+\newpage
 
 # Matrix Factorization
+Collaborative-Filtering systems use an user-item matrix as a basis to identify similarity between relationships.  In the simplified example below the system will assume that Bart is most likely to rate movie 3 with a 6 since he agrees with Nuray on other movies. 
 
-Collaborative-Filtering systems use an user-item matrix as a basis to identify similarity between relationships.
-
-```{r example, results="show"}
-User <- c('US_1','US_2','US_3')
-Movie_1 <- c(NA,NA,5)
-Movie_2 <- c(1,NA,4)
-as.matrix(cbind(User,Movie_1,Movie_2)) %>% knitr::kable(format = "pandoc", caption = "User-item matrix") 
+```{r example matrix, results="show"}
+User <- c("Bart","Karel","Nuray")
+Movie_1 <- c(5,2,5)
+Movie_2 <- c(1,8,1)
+Movie_3 <- c("","",6)
+as.matrix(cbind(User,Movie_1,Movie_2, Movie_3)) %>% knitr::kable(format = "pandoc", caption = "User-item matrix") 
 ```
 
+Other common names for this task include ‘collaborative filtering’, ‘matrix completion’ and ‘matrix recovery’.
+
 # The MovieLens Dataset 
-GroupLens Research has collected and made available rating data sets from the MovieLens web site. A data set with 10 million rows is split into a train (90%) and a 'unseen' test (10%) set for evaluation.
+GroupLens Research has collected and made available rating data sets from the MovieLens web site. Among others, a data set with 10 million rows which we split into a train (90%) and a ‘unseen’ test (10%) set for evaluation.
 
 ## Description
-The training dataset contains `r dim(train)[1]` records and `r dim(train)[2]` columns with:
+The training dataset consists of `r dim(train.org)[1]` records and `r dim(train.org)[2]` columns with:
 
-* `r n_distinct(train$userId)` user id's,
-* `r n_distinct(train$movieId)` movie id's with title and genre,
-* `r n_distinct(train$genres)` unieke values in the genres column, muliple genres may apply to one movie,
-* `r n_distinct(train$rating)`, ratings, in steps of 0.05 from 0 to 5 so 10 possible outcomes.
+* `r n_distinct(train.org$userId)` anonymized user IDs.
+* `r n_distinct(train.org$movieId)` movies with title and genre, the real MovieLens id.
+* `r n_distinct(train.org$genres)` unique lists in the genres column.
+* The ratings, made on a 5-star scale, with half-star increments. Hence 10 possible outcomes of our prediction algorithm.
+* Timestamp of the rating.
 
-The data spreads a timespam from `r min(as_datetime(train$timestamp, origin = "1970-01-01"))` until `r max(as_datetime(train$timestamp, origin = "1970-01-01"))`.
+The data spreads a timespam from `r min(as_datetime(train.org$timestamp, origin = "1970-01-01"))` until `r max(as_datetime(train.org$timestamp, origin = "1970-01-01"))`.
 
-```{r example2, results="show"}
-head(train, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
+```{r example rows, results="show"}
+head(train.org, 6) %>% knitr::kable(format = "pandoc", caption = "Example rows") 
 ```
 
 Notes:
 
 * The title contains the release year of the movie.
 * The genre column contains multiple genres seperated with a pipe. 
-
-
-## Descriptive statistics
-
-In addition to the quantative description of the dataset in the previous paragraph some basic statistics about ratings may be of interest. 
-```{r}
-
-```
+* The timestamp of the rating represented seconds since midnight Coordinated Universal Time (UTC) of January 1, 1970.
 
 ## Missing values
-The dataset has `r sum(is.na(train))` records with missing values. 
+The dataset has `r sum(is.na(train.org))` records with missing values. 
 
-```{r}
-# Which is `r round((sum(is.na(train))/sum(complete.cases(train)))*100,2)` procent. 
-train %>% summarise_all(funs((sum(is.na(.))/length(.))*100)) %>% round(.,2)  %>% knitr::kable(format = "pandoc", caption = "Percentage missing values per column") 
+```{r show missing, echo=FALSE, warning=FALSE, error=FALSE}
+# Which is `r round((sum(is.na(train.org))/sum(complete.cases(train.org)))*100,2)` procent. 
+train.org %>% summarise_all(funs((sum(is.na(.))/length(.))*100)) %>% round(.,2)  %>% knitr::kable(format = "pandoc", caption = "Percentage missing values per column") 
 ```
 
-## Feature engineering
-A Collaborative-Filtering recommendation system uses a matrix of users, movies and ratings as values. Thus, further feature engineering is not required. One might consider the engineering of the following derived features when building a Content-Based recommendation system:  
+\newpage
 
-* Date attributes: year, month, day of week, hour. 
-* Release year (included in the title text). 
+## Suggestions for feature engineering when going content based
+A Collaborative-Filtering recommendation system uses a matrix of users, movies and ratings as values. Thus, feature engineering is not required. The engineering of the following derived features may add value to the data when building a Content-Based recommendation system:
+
+* Date attributes: year, month, day of week, hour.
+* Release year (included in the title text).
 * Number of genres per movie.
 * One-hot encoding of genres.
 * Add mean, median and or mode of rating per genre, movie and user.
 * Add number of ratings per movie.
 * Add number of rating per user.
 
+# Machine learning model based on LIBMF with R package ‘recosystem’
+I used the R package ‘recosystem’ which is a wrapper of the open source LIBMF library developed by the Machine Learning Group at Nation Taiwan University.  It is developed for recommender system based on ‘collaborative filtering’.
+
+## Main features of LIBMF
+The main features of LIBMF include:
+
+* Providing solvers for real-valued matrix factorization, binary matrix factorization, and one-class matrix factorization.
+* Parallel computation in a multi-core machine and other technical performance optimizations.
+* Cross validation for parameter selection.
+* Support disk-level training, which largely reduces the memory usages.
+
+\newpage
+
+## Design decisions
+I made the following design decisions to optimize RMSE and to overcome some minor shortcomings:
+
+* Instead of providing the original rating values I decided to convert the rating to integers after multiplying the original value by 2. 
+* The algorithm estimates the rating given by users to the movies rather than picking a rating out of the possible values ranging from 1 to 10.  Hence, the outcome of the prediction must be rounded to the nearest integer for optimal RSME.
+* The algorithm predicts values out of the range of the provided integer values. Predictions below 1 are adjusted to 1 and predictions above 10 are adjusted to 10.
+
+## Process flow
+The final model consists out of the following steps:
+
+* Feature selection: select user ID, movie ID and rating.
+* Data conversion: convert all features to integers.  Rating was multiplied with 2 to get it on a 1 to 10 scale.
+* Determine optimal parameters with cross validation.
+* Train model on 9.000k rows, which 90% of the provided data.
+* Predict on 1000k unseen rows, which is 10% of the provided data.
+* Correct predictions out of the 1 to 10 range.
+* Convert ratings and predictions back to the original scale. 
+* Calculate RMSE: sqrt(mean((observed - predicted) ^ 2)
+
+\newpage
+
+# Discussion
+[needs an update, still working on this chapter]
+
+* My mission was to get a grasp of the concepts. I did not (yet) analyze the predictions made on topics like bias or overfitting. 
+* Training took a long but reasonable amount of time on my laptop (Pentium I7, SSD, 8 GB memory). I did not investigate the scalability of the model.
+* For reasons of technical performance I evaluated just a view settings for parameters during cross validation. Result might improve a bit when more effort is put in parameter tuning,
+* [Low accuracy. The model will give a good estimate, which can be used as an indication of user preferences but fails to be precise. ]
+
+
+# Conclusion
+[needs an update, still working on this chapter]\
+The evaluation statistic is root-mean-squared error (RMSE) and must be lower than 0.8775 to be rewarded with the maximum grade. The algorithm scores a RMSE of 0.7918. Nice!\
+\
+[In general blabla about pro’s and con’s. Easy to setup with R or Python, but may be hard to scale.  Must be combined in an ensemble to add capabilities for adding new users and options (movies) out of which the users can chose from. Cold start problem]
 
 
 
