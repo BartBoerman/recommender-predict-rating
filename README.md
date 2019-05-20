@@ -5,4 +5,4 @@ by Harvard University (HarvardX). The goal is to predict movie ratings on MovieL
 
 * [The analysis: 'Building a recommender system with R' (predict-movie-ratings.pdf)](/predict-movie-ratings.pdf)
 * [The R scripts with the model (predict-movie-ratings.R)](/predict-movie-ratings.R)
-* [The markdown file which created the pdf (predict-movie-ratings.pdf)](/predict-movie-ratings.R)
+* [The markdown file which created the pdf (predict-movie-ratings.pdf)](/predict-movie-ratings.Rmd)
