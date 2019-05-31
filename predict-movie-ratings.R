@@ -32,8 +32,8 @@ if (!exists("train") | !exists("test")){
                                              title = as.character(title),
                                              genres = as.character(genres))
   movielens <- left_join(ratings, movies, by = "movieId")
-  # !!!!! Uncomment line below to test on smaller dataset !!!!!.
-  #movielens <- head(movielens, 10000)
+  # !!!!! Uncomment line below to test on smaller dataset. Rerun after removing the ml-10M100k folder !!!!!
+  # movielens <- head(movielens, 10000)
   
   # Test set will be 10% of MovieLens data
   
