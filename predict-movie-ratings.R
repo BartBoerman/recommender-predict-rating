@@ -25,7 +25,7 @@ if(!require(recosystem)) install.packages("recosystem", repos = "http://cran.us.
 # Extract data set from MovieLens as defined in EDX course: HarvardX data science capstone             #       
 ########################################################################################################
 dl <- tempfile()
-# Only download file if ratings and/or movies do not exists
+# I modified the script so that it only downloads the files if they do not exists
 if (!file.exists("ml-10M100K/ratings.dat") | !file.exists("ml-10M100K/movies.dat")){
   download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
   ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
@@ -43,12 +43,12 @@ if (!exists("train") | !exists("test")){
                                              title = as.character(title),
                                              genres = as.character(genres))
   movielens <- left_join(ratings, movies, by = "movieId")
-  # !!!!! Line to test on smaller dataset !!!!!.
+  # !!!!! Uncomment line below to test on smaller dataset !!!!!.
   #movielens <- head(movielens, 10000)
   
   # Test set will be 10% of MovieLens data
   
-  set.seed(1) # , sample.kind = "Rounding" gives error: non-uniform 'Rounding' sampler used. 
+  set.seed(1, sample.kind = "Rounding") #  gives error: non-uniform 'Rounding' sampler used. 
   test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
   edx <- movielens[-test_index,]
   temp <- movielens[test_index,]
@@ -74,11 +74,15 @@ if (!exists("train") | !exists("test")){
 ########################################################################################################
 # Collaborative-Filtering systems create a matrix of users and movies with known ratings as values. 
 # Hence, we do not load other columns into memory.
+# 'recosystem' Needs userId and MovieId to be integers
+# Rating is multiplied with 2 to get on integer. You can provide ratings as real values both RMSE will be lower.
+# I did not yet investigate why.
 train <- train  %>%  select(userId, movieId, rating) %>%
   mutate(userId = as.integer(userId)
          ,movieId = as.integer(movieId)
          ,rating = as.integer(rating * 2))   
-# 'data_memory' Is a function in the recosystem package.
+# 'data_memory' Is a function in the recosystem package. It loads the data into memory. 
+# Consider using a disk based approach when low on memory 
 trainMemory <- data_memory(user_index = train$userId,
                            item_index = train$movieId,
                            rating = train$rating, index1 = TRUE)
@@ -90,7 +94,7 @@ recommender <- Reco()
 # The recommender uses cross validation to find the optimal parameters.
 # This is simplified by limiting the number of values per parameter to be tested. 
 # The number of cross validations is set to 5 for faster processing time.
-# !! The training process will consume a lot of time. Please take a break !!.
+# !! The training process will consume a lot of time. Please take a break !!
 opts <- recommender$tune(trainMemory, 
                          opts = list(
                            dim      = c(65), # number of latent factors    
@@ -138,6 +142,7 @@ test <- test %>% mutate(prediction_opts = round(case_when(prediction < 1 ~ 1, pr
 RMSE <- rmse(test$rating / 2, round(test$prediction_opts) / 2)  
 # When input is the original, real-valued rating use: RMSE <- rmse(test$rating, ceiling(test$prediction_opts * 2)/2 )   
 print(RMSE) # 0.7917868
-ACCURACY <- accuracy(test$rating / 2, round(test$prediction_opts) / 2) 
-print(ACCURACY) # 0.2763559
+# Uncomment lines below if interested in accuracy. It's 27.64% accurate predicting on 10 possible outcomes.
+#ACCURACY <- accuracy(test$rating / 2, round(test$prediction_opts) / 2) 
+#print(ACCURACY) # 0.2763559
 
