@@ -1,6 +1,6 @@
-####################################################################################
-# Required packages                                                                #   
-####################################################################################
+########################################################################################################
+# Required packages                                                                                    #       
+########################################################################################################
 # Data wrangling.
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
@@ -10,17 +10,6 @@ if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-proj
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 # Recommender system using Matrix Factorization, R wrapper of the 'libmf' library.
 if(!require(recosystem)) install.packages("recosystem", repos = "http://cran.us.r-project.org")
-####################################################################################
-# About recosystem                                                                 #    
-####################################################################################
-# https://www.r-bloggers.com/recosystem-recommender-system-using-parallel-matrix-factorization/
-# https://statr.me/2016/07/recommender-system-using-parallel-matrix-factorization/
-# https://cran.r-project.org/web/packages/recosystem/recosystem.pdf
-# https://rpubs.com/tarashnot/recommender_comparison
-# http://infolab.stanford.edu/~ullman/mmds/ch9.pdf
-# http://www.mmds.org/
-# https://datajobs.com/data-science-repo/Recommender-Systems-[Netflix].pdf
-# https://medium.com/@cfpinela/recommender-systems-user-based-and-item-based-collaborative-filtering-5d5f375a127f
 ########################################################################################################
 # Extract data set from MovieLens as defined in EDX course: HarvardX data science capstone             #       
 ########################################################################################################

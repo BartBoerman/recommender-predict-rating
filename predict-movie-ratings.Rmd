@@ -37,6 +37,19 @@ options(figcap.prefix = "Figure", figcap.sep = ":", figcap.prefix.highlight = "*
 source('predict-movie-ratings.R', echo = FALSE, verbose = FALSE)
 ```
 
+# Problem description
+Train a machine learning algorithm using the inputs in one subset to predict movie ratings in the validation set (unseen test data). The data used is the MovieLens Dataset with 10 million ratings. The download script with basic data wrangling (combine, split into train and test data) is provided by EDX. 
+
+# Methods
+I performed the following tasks to design and test a R scripts which predicts movie ratings:
+
+* Background study on popular approaches for designing a recommender system.
+* Improve the script provided by EDX so that data is downloaded only once when already available.
+* Basic exploratory data analysis.
+* I used the ‘recosystem’ package for Collaborative-Filtering.
+* Parameter tuning, and model training and evaluation on the training data.
+* Test the model on the ‘unseen’ test data.
+
 # Popular approaches for designing a recommender system
 
 * **Content-Based systems** analyse the characteristics of items. Similarity of items is determined by measuring the similarity in their properties. Content-based filtering recommends items based on a comparison between the content of the items and a user profile. The content of each item is represented as a set of descriptors or tags given to the item by users. The user profile is represented with the same descriptors and built up by analyzing the content of items which have been seen by the user.
@@ -140,21 +153,55 @@ The final model consists out of the following steps:
 \newpage
 
 # Discussion
-[needs an update, still working on this chapter]
 
-* My mission was to get a grasp of the concepts. I did not (yet) analyze the predictions made on topics like bias or overfitting. 
-* Training took a long but reasonable amount of time on my laptop (Pentium I7, SSD, 8 GB memory). I did not investigate the scalability of the model.
-* For reasons of technical performance I evaluated just a view settings for parameters during cross validation. Result might improve a bit when more effort is put in parameter tuning,
-* [Low accuracy. The model will give a good estimate, which can be used as an indication of user preferences but fails to be precise. ]
-
+* I did not (yet) analyze the predictions on topics like distribution, bias and overfitting. 
+* Training on the 9000k row training dataset took a long but reasonable amount of time on my laptop (Pentium I7, SSD, 8 GB). I did not investigate the scalability of the model.
+* For reasons of technical performance I evaluated just a view settings for parameters optimization during cross validation. Result might improve a bit when more effort towards parameter tuning.
+* Low absolute accuracy of around 25% out of 10 possible outcomes (ratings). The model will give a good estimate (RMSE of 0.7918), which can be used as an indication of user preferences towards an option (movie) but fails to be precise. 
 
 # Conclusion
-[needs an update, still working on this chapter]\
-The evaluation statistic is root-mean-squared error (RMSE) and must be lower than 0.8775 to be rewarded with the maximum grade. The algorithm scores a RMSE of 0.7918. Nice!\
+The main task of a recommender system is to predict the users response to different options. My mission was to grasp the concepts of a collaborative-filtering based recommender system and to provide an example in R. This document and the accompanying script show that it is relatively simple to create a basic system which predicts movie rating. The algorithm scores a RMSE of 0.7918. More than enough to be rewarded with the maximum grade.\
 \
-[In general blabla about pro’s and con’s. Easy to setup with R or Python, but may be hard to scale.  Must be combined in an ensemble to add capabilities for adding new users and options (movies) out of which the users can chose from. Cold start problem]
+Collaborative-filtering using LIBMF is easy to setup in both R and Python but has, as a method, the following cons:
 
+* The so-called ‘Continuous Cold Start’ when the systems welcomes new movies and/or new users. By design it will not be able to provide reasonable predictions.
+* Uses within a system need be active in providing ratings. Inactivity hides changes in their interests over time.
+* The system needs to be retrained on the complete matrix after receiving new ratings. Hence, it has a performance penalty. One could consider training different models for different demographic and geographic segments. 
 
+\newpage
+
+A optimal solution would be an ensemble with business rule and more extensive content-based systems. Other common tips are:
+
+* Apply a popularity based strategy. Trending products can be determined by trends and what’s been popular recently, demographically, regionally, seasonal, or at that certain time of the day.
+* Other user actions like showing interest, viewing or buying, are potentially more robust because most users do not provide product ratings. These actions can be translate to a binary indicator which can be used as input for a collaborative-filtering based recommender system.
+
+# References
+
+## Resources consulted during background study
+I read, and used, the following online content during the background study about building a recommender system in R:
+
+* http://infolab.stanford.edu/~ullman/mmds/ch9.pdf
+* https://www.csie.ntu.edu.tw/~cjlin/libmf/
+* https://statr.me/2016/07/recommender-system-using-parallel-matrix-factorization/
+* https://datajobs.com/data-science-repo/Recommender-Systems-[Netflix].pdf
+* https://medium.com/@cfpinela/recommender-systems-user-based-and-item-based-collaborative-filtering-5d5f375a127f
+
+## Resources consulted for technical design
+I recommend reading the following online posts which I used as a basis for the technical solution:
+
+* https://cran.r-project.org/web/packages/recosystem/recosystem.pdf
+* https://www.r-bloggers.com/recosystem-recommender-system-using-parallel-matrix-factorization/
+
+\newpage
+
+## R packages used in software code
+The following R open source packages are used in the software code which is described, or used, in this document:
+
+* **'tidyverse'**, A collection of R packages for data science. Includes 'dplyr' for data wrangling tasks. Ships with 'ggplot2' for data visualization.
+* **'lubridate'**, Provides date functions, e.g. extract month and year from a date.
+* **'Metrics'**, Calculates performance metrics for model validation.
+* **'Caret'**, The caret package (short for Classification And Regression Training) contains functions to streamline the model training process for complex regression and classification problems. It provides a common interface to R packages.
+* **'recosystem'**, Recommender system using Matrix Factorization, R wrapper of the 'libmf' library. LIBMF is a Matrix-factorization Library for Recommender Systems. It is open source and developped by the Machine Learning Group at National Taiwan University.
 
 
 
